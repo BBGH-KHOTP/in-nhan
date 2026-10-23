@@ -106,11 +106,11 @@
     function labelHtml(d) {
       var loai = String(d.loai || '').trim().toLowerCase();
       var extra = '';
-      if (loai === 'xuất' || loai === 'xuat') {
+      if (loai === 'Xuất' || loai === 'xuat') {
         extra =
           '<div class="info-row"><b>LSX: </b><span class="lsx-text">' + esc(d.lsx) + '</span></div>' +
           '<div class="info-row"><b>Xưởng: </b><span>' + esc(d.Donvi) + '</span></div>';
-      } else if (loai === 'nhập' || loai === 'nhap') {
+      } else if (loai === 'Nhập' || loai === 'nhap') {
         extra =
           '<div class="info-row"><b>ĐNM: </b><span>' + esc(d.dnm) + '</span></div>' +
           '<div class="info-row"><b>PO: </b><span>' + esc(d.po) + '</span></div>';
