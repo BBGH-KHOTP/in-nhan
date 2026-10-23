@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Biên bản giao nhận hàng</title>
+  <style>
+    @page { size: A4; margin: 10mm 12mm; }
+    * { box-sizing: border-box; }
+    body { font-family: "Times New Roman", Times, serif; font-size: 11pt; line-height: 1.4; margin: 0; padding: 0; background: #fff; color: #000; }
+    .page { width: 185mm; margin: auto; padding: 5mm 0; }
+
+    .header-wrap { display: flex; align-items: stretch; margin-bottom: 8px; border: 1.5px solid #000; }
+    .header-logo { width: 25%; flex-shrink: 0; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; padding: 6px 8px; }
+    .header-info { width: 75%; display: flex; align-items: center; padding: 6px 10px 6px 12px; }
+    .logo-img { width: 100%; max-height: 65px; object-fit: contain; object-position: center; display: block; }
+    .company-info { font-size: 9pt; line-height: 1.6; }
+    .company-info b { font-size: 10pt; text-transform: uppercase; }
+    .doc-code-top { font-size: 9pt; font-family: "Courier New", monospace; text-align: right; margin-bottom: 2px; }
+
+    .title-area { margin: 12px 0 16px; }
+    .title-area h1 { font-size: 18pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 6px; text-align: center; }
+    .title-area .sub { font-style: italic; font-size: 10.5pt; margin: 2px 0; text-align: right; }
+    .title-area .so-phieu { font-weight: bold; font-size: 11pt; margin: 4px 0 0; text-align: right; }
+
+    .party { margin-bottom: 8px; font-size: 11pt; }
+    .party-title { font-weight: bold; text-transform: uppercase; font-size: 11pt; margin-bottom: 4px; }
+    .party-row { display: flex; gap: 4px; margin-bottom: 3px; padding-left: 12px; }
+    .party-label { white-space: nowrap; min-width: 75px; }
+    .party-value { flex: 1; border-bottom: 1px dotted #555; min-height: 18px; padding: 0 4px; }
+    .party-row-2col { display: flex; gap: 16px; padding-left: 12px; margin-bottom: 3px; }
+    .party-row-2col .half { display: flex; gap: 4px; flex: 1; }
+    .party-row-2col .half .party-label { min-width: 75px; }
+
+    .intro-text { margin: 12px 0 8px; font-size: 11pt; font-style: italic; }
+    table.main-table { width: 100%; border-collapse: collapse; font-size: 10.5pt; margin-bottom: 10px; }
+    table.main-table th, table.main-table td { border: 1px solid #000; padding: 6px 4px; text-align: center; vertical-align: middle; }
+    table.main-table th { background: #f2f2f2; font-weight: bold; text-transform: uppercase; font-size: 9.5pt; line-height: 1.4; }
+    table.main-table td.left { text-align: left; padding-left: 6px; }
+    table.main-table tr.total-row td { font-weight: bold; }
+    table.main-table tr:nth-child(even) td { background: #fafafa; }
+    table.main-table tr.total-row td { background: #eaeaea !important; }
+
+    .note-area { margin-top: 8px; font-size: 10pt; line-height: 1.5; }
+    .note-area .italic { font-style: italic; }
+    .note-area .bold { font-weight: bold; }
+
+    table.sign-table { width: 100%; border-collapse: collapse; margin-top: 20px; table-layout: fixed; }
+    table.sign-table td { border: none; text-align: center; vertical-align: top; padding: 4px 2px; font-size: 9.5pt; }
+    .sign-title { font-weight: bold; text-transform: uppercase; line-height: 1.3; }
+    .sign-sub { font-style: italic; font-size: 8.5pt; color: #333; }
+    .sign-space { height: 60px; }
+    .sign-name { font-weight: bold; font-size: 9.5pt; min-height: 16px; }
+
+    @media print {
+      .no-print { display: none !important; }
+      body { margin: 0; }
+      table.main-table tr:nth-child(even) td { background: #fff !important; }
+    }
+    .btn-print {
+      position: fixed; top: 16px; right: 16px; z-index: 999; padding: 10px 22px; background: #1b5e20; color: #fff;
+      border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,.3);
+    }
+    .btn-print:hover { background: #2e7d32; }
+    .btn-print:disabled { background: #999; cursor: wait; }
+    .loading { text-align: center; margin-top: 120px; font-style: italic; font-size: 13pt; color: #555; }
+  </style>
+</head>
+<body>
+  <button id="btn-print" class="btn-print no-print" disabled>🖨️ In Biên Bản</button>
+
+  <div class="page">
+    <div id="content"><div class="loading">⏳ Đang tải dữ liệu biên bản giao nhận hàng...</div></div>
+  </div>
+
+  <script>
+
+    // ===== Đọc dữ liệu từ link (phần # được ưu tiên, không có thì lấy ?) =====
+    var _h = new URLSearchParams(location.hash.replace(/^#/, ''));
+    var _q = new URLSearchParams(location.search);
+    function P(k) { return _h.get(k) || _q.get(k) || ''; }
+
+    // Mỗi dòng: 13 trường cách nhau bởi "§", kết thúc bằng "¦" (do cột ảo "Gói dòng" tạo ra)
+    function parseCt(raw) {
+      return String(raw || '').split('¦')
+        .map(function (r) { return r.replace(/^\s*,\s*/, '').trim(); })
+        .filter(function (r) { return r.length; })
+        .map(function (r) {
+          var f = r.split('§');
+          return { maSP: f[0] || '', tenSP: f[1] || '', dvt: f[2] || '', soLuong: f[3] || '', ghiChu: f[4] || '',
+                   id_sp: f[5] || '', ngay: f[6] || '', dnm: f[7] || '', po: f[8] || '', loai: f[9] || '',
+                   lsx: f[10] || '', Donvi: f[11] || '', ke: f[12] || '' };
+        });
+    }
+    function tongHop() {
+      return { soPhieu: P('id'), ngay: P('ngay'), ngayLap: P('ngay'), tongSL: P('tongsl'), lyDo: P('lydo'),
+               kho: P('kho'), diaChi: P('diachi'), nguoiTao: P('nguoitao') };
+    }
+
+    function esc(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function showError(msg) {
+      document.getElementById('content').innerHTML = '<h3 style="color:red">❌ ' + esc(msg) + '</h3>';
+    }
+
+    var idPhieu = P('id');
+    var btn = document.getElementById('btn-print');
+    btn.addEventListener('click', function () { window.print(); });
+
+    if (!idPhieu) {
+      showError('Thiếu dữ liệu trên link. Hãy mở trang từ nút in trong AppSheet.');
+    } else {
+      document.title = 'Biên Bản Giao Nhận Hàng: ' + idPhieu;
+      renderBBGH({ thongTinChung: tongHop(), chiTietVatTu: parseCt(P('ct')) });
+    }
+
+    function renderBBGH(data) {
+      if (data.error) { showError(data.error); return; }
+
+      var tc = data.thongTinChung;
+      var chiTietVatTu = data.chiTietVatTu || [];
+
+      var rows = chiTietVatTu.map(function (item, i) {
+        return '<tr>' +
+          '<td>' + (i + 1) + '</td>' +
+          '<td>' + esc(tc.lyDo) + '</td>' +
+          '<td>' + esc(item.maSP) + '</td>' +
+          '<td class="left">' + esc(item.tenSP) + '</td>' +
+          '<td>' + esc(item.dvt) + '</td>' +
+          '<td>' + esc(item.soLuong) + '</td>' +
+          '<td class="left">' + esc(item.ghiChu) + '</td>' +
+        '</tr>';
+      }).join('');
+
+      document.getElementById('content').innerHTML = `
+        <div class="doc-code-top">QT.TCMC.VCNB/03-BM02</div>
+        <div class="header-wrap">
+          <div class="header-logo">
+            <img class="logo-img" src="https://thacoindustries.com/wp-content/uploads/2023/08/LOGO_24-7-2023-01.png" alt="THACO INDUSTRIES">
+          </div>
+          <div class="header-info">
+            <div class="company-info">
+              <b>CÔNG TY TNHH MTV TỔ HỢP CƠ KHÍ THACO CHU LAI</b><br>
+              Địa Chỉ: KCN Cơ khí Ô tô Chu Lai Trường Hải - Xã Núi Thành - Tỉnh Quảng Nam<br>
+              Điện Thoại: 02353.565.327 &nbsp;&nbsp; MST: 4001264725
+            </div>
+          </div>
+        </div>
+
+        <div class="title-area">
+          <h1>Biên Bản Giao Nhận Hàng</h1>
+          <div class="sub">Chu Lai, ngày ${esc(tc.ngayLap) || '........'}</div>
+          <div class="so-phieu">SỐ: ${esc(tc.soPhieu)}</div>
+        </div>
+
+        <div class="party">
+          <div class="party-title">A. Bên giao: CÔNG TY TNHH MTV TỔ HỢP CƠ KHÍ THACO CHU LAI</div>
+          <div class="party-row">
+            <span class="party-label">Địa chỉ:</span>
+            <span class="party-value">KCN Cơ khí Ô tô Chu Lai Trường Hải - Xã Núi Thành - Tỉnh Quảng Nam</span>
+          </div>
+          <div class="party-row-2col">
+            <div class="half"><span class="party-label">Đại diện:</span><span class="party-value"></span></div>
+            <div class="half"><span class="party-label">Điện thoại:</span><span class="party-value"></span></div>
+          </div>
+        </div>
+
+        <div class="party">
+          <div class="party-title">B. Bên nhận: ${esc(tc.kho) || '........................................'}</div>
+          <div class="party-row">
+            <span class="party-label">Địa chỉ:</span>
+            <span class="party-value">${esc(tc.diaChi)}</span>
+          </div>
+          <div class="party-row-2col">
+            <div class="half"><span class="party-label">Đại diện:</span><span class="party-value"></span></div>
+            <div class="half"><span class="party-label">Điện thoại:</span><span class="party-value"></span></div>
+          </div>
+        </div>
+
+        <div class="party">
+          <div class="party-title">C. Bên vận chuyển:</div>
+          <div class="party-row-2col">
+            <div class="half"><span class="party-label">Tên tài xế:</span><span class="party-value"></span></div>
+            <div class="half"><span class="party-label">Điện thoại:</span><span class="party-value"></span></div>
+          </div>
+          <div class="party-row"><span class="party-label">BSX:</span><span class="party-value"></span></div>
+        </div>
+
+        <div class="intro-text">Các bên tiến hành giao nhận hàng hóa với nội dung sau:</div>
+
+        <table class="main-table">
+          <thead>
+            <tr>
+              <th style="width: 5%">STT</th>
+              <th style="width: 15%">LSX-ĐH</th>
+              <th style="width: 15%">Mã SP</th>
+              <th style="width: 35%">Tên Chi Tiết / Quy Cách</th>
+              <th style="width: 8%">ĐVT</th>
+              <th style="width: 10%">Số lượng</th>
+              <th style="width: 12%">Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+            <tr class="total-row">
+              <td colspan="4">Tổng cộng</td>
+              <td></td>
+              <td>${esc(tc.tongSL)}</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="note-area">
+          <div class="italic">Hàng khô ráo, đúng quy cách</div>
+          <div><span class="bold">Ghi chú:</span>
+            <span class="italic"> - Biên bản này được lập 03 bản, có giá trị pháp lý như nhau, mỗi bên giữ 01 bản</span>
+          </div>
+        </div>
+
+        <table class="sign-table">
+          <tr>
+            <td><div class="sign-title">Duyệt</div><div class="sign-sub">(Ký, ghi rõ họ tên)</div></td>
+            <td><div class="sign-title">P. Chất Lượng</div><div class="sign-sub">(Ký, ghi rõ họ tên)</div></td>
+            <td><div class="sign-title">Bên giao</div><div class="sign-sub">(Ký, ghi rõ họ tên)</div></td>
+            <td><div class="sign-title">Bảo Vệ</div><div class="sign-sub">(Ký, ghi rõ họ tên)</div></td>
+            <td><div class="sign-title">Bên Vận Chuyển</div><div class="sign-sub">(Ký, ghi rõ họ tên)</div></td>
+            <td><div class="sign-title">Bên Nhận</div><div class="sign-sub">(Ký, ghi rõ họ tên)</div></td>
+            <td><div class="sign-title">Người Lập</div><div class="sign-sub">(Ký, ghi rõ họ tên)</div></td>
+          </tr>
+          <tr>
+            <td class="sign-space"></td><td class="sign-space"></td><td class="sign-space"></td><td class="sign-space"></td>
+            <td class="sign-space"></td><td class="sign-space"></td><td class="sign-space"></td>
+          </tr>
+          <tr>
+            <td class="sign-name"></td><td class="sign-name"></td><td class="sign-name"></td><td class="sign-name"></td>
+            <td class="sign-name"></td><td class="sign-name"></td><td class="sign-name"></td>
+          </tr>
+        </table>
+      `;
+      btn.disabled = false;
+    }
+  </script>
+</body>
+</html>

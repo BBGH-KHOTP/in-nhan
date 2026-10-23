@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phiếu xuất kho</title>
+  <style>
+    @page { size: A4; margin: 15mm; }
+    body { font-family: "Times New Roman", Times, serif; margin: 0; padding: 0; background-color: #fff; }
+    .page { width: 180mm; margin: auto; }
+
+    .header-table { width: 100%; border: none; font-size: 11pt; }
+    .title { text-align: center; font-weight: bold; font-size: 16pt; margin: 20px 0 10px 0; text-transform: uppercase; }
+    .sub-title { text-align: center; font-style: italic; font-size: 11pt; margin-bottom: 20px; }
+
+    .info-section { margin-bottom: 10px; font-size: 12pt; line-height: 1.6; }
+    .dotted-line { border-bottom: 1px dotted #000; flex-grow: 1; padding-left: 5px; }
+    .info-row { display: flex; margin-bottom: 5px; }
+
+    table.main-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11pt; }
+    table.main-table th, table.main-table td { border: 1px solid black; padding: 8px 4px; text-align: center; }
+    table.main-table th { background-color: #f2f2f2; font-weight: bold; }
+
+    .footer-section { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; text-align: center; font-size: 11pt; }
+    .footer-col { display: flex; flex-direction: column; align-items: center; }
+    .name-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; text-align: center; margin-top: 60px; font-weight: bold; font-size: 11pt; }
+
+    @media print {
+      .no-print { display: none !important; }
+      body { margin: 0; }
+    }
+    .btn-print {
+      position: fixed; top: 20px; right: 20px; padding: 10px 20px; background: #d32f2f; color: white;
+      border: none; border-radius: 5px; cursor: pointer; font-weight: bold;
+    }
+    .btn-print:disabled { background: #999; cursor: wait; }
+    .loading { text-align: center; margin-top: 100px; font-style: italic; }
+  </style>
+</head>
+<body>
+  <button id="btn-print" class="btn-print no-print" disabled>🖨️ In phiếu</button>
+
+  <div class="page">
+    <div id="content"><div class="loading">Đang tải dữ liệu phiếu xuất kho...</div></div>
+  </div>
+
+  <script>
+
+    // ===== Đọc dữ liệu từ link (phần # được ưu tiên, không có thì lấy ?) =====
+    var _h = new URLSearchParams(location.hash.replace(/^#/, ''));
+    var _q = new URLSearchParams(location.search);
+    function P(k) { return _h.get(k) || _q.get(k) || ''; }
+
+    // Mỗi dòng: 13 trường cách nhau bởi "§", kết thúc bằng "¦" (do cột ảo "Gói dòng" tạo ra)
+    function parseCt(raw) {
+      return String(raw || '').split('¦')
+        .map(function (r) { return r.replace(/^\s*,\s*/, '').trim(); })
+        .filter(function (r) { return r.length; })
+        .map(function (r) {
+          var f = r.split('§');
+          return { maSP: f[0] || '', tenSP: f[1] || '', dvt: f[2] || '', soLuong: f[3] || '', ghiChu: f[4] || '',
+                   id_sp: f[5] || '', ngay: f[6] || '', dnm: f[7] || '', po: f[8] || '', loai: f[9] || '',
+                   lsx: f[10] || '', Donvi: f[11] || '', ke: f[12] || '' };
+        });
+    }
+    function tongHop() {
+      return { soPhieu: P('id'), ngay: P('ngay'), ngayLap: P('ngay'), tongSL: P('tongsl'), lyDo: P('lydo'),
+               kho: P('kho'), diaChi: P('diachi'), nguoiTao: P('nguoitao') };
+    }
+
+    function esc(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function showError(msg) {
+      document.getElementById('content').innerHTML = '<h3 style="color:red">' + esc(msg) + '</h3>';
+    }
+
+    var idPhieu = P('id');
+    var btn = document.getElementById('btn-print');
+    btn.addEventListener('click', function () { window.print(); });
+
+    if (!idPhieu) {
+      showError('Thiếu dữ liệu trên link. Hãy mở trang từ nút in trong AppSheet.');
+    } else {
+      document.title = 'Phiếu xuất kho: ' + idPhieu;
+      renderPhieu({ thongTinChung: tongHop(), chiTietVatTu: parseCt(P('ct')) });
+    }
+
+    function renderPhieu(data) {
+      if (data.error) { showError(data.error); return; }
+
+      var tc = data.thongTinChung;
+      var ct = data.chiTietVatTu || [];
+
+      var rows = ct.map(function (item, index) {
+        return '<tr>' +
+          '<td>' + (index + 1) + '</td>' +
+          '<td>' + esc(item.maSP) + '</td>' +
+          '<td style="text-align:left">' + esc(item.tenSP) + '</td>' +
+          '<td>' + esc(item.dvt) + '</td>' +
+          '<td>' + esc(item.soLuong) + '</td>' +
+          '<td>' + esc(item.ghiChu) + '</td>' +
+        '</tr>';
+      }).join('');
+
+      for (var i = ct.length; i < 8; i++) {
+        rows += '<tr><td>' + (i + 1) + '</td><td></td><td></td><td></td><td></td><td></td></tr>';
+      }
+
+      document.getElementById('content').innerHTML = `
+        <table class="header-table">
+          <tr>
+            <td style="width:60%">
+              <b>Đơn vị: CTY TNHH MTV TỔ HỢP CƠ KHÍ THACO C.LAI</b><br>
+              <b>Bộ phận: Kho vật tư</b>
+            </td>
+            <td style="text-align:center">
+              <b>Mẫu số: 02 - VT</b><br>
+              <small>(Ban hành theo TT số: 200/2014/TT- BTC<br>Ngày 22/12/2014 của Bộ trưởng BTC)</small>
+            </td>
+          </tr>
+        </table>
+
+        <div class="title">PHIẾU XUẤT KHO</div>
+        <div class="sub-title">Số: ${esc(tc.soPhieu)}</div>
+
+        <div class="info-section">
+          <div class="info-row">- Họ tên người nhận: <span class="dotted-line"></span></div>
+          <div class="info-row">- Lý do xuất kho: <span class="dotted-line">${esc(tc.lyDo)}</span></div>
+          <div class="info-row">- Nhập tại kho: <span class="dotted-line">${esc(tc.kho)}</span></div>
+        </div>
+
+        <table class="main-table">
+          <thead>
+            <tr>
+              <th style="width:5%">Stt</th>
+              <th style="width:15%">Mã SP</th>
+              <th style="width:35%">Tên sản phẩm</th>
+              <th style="width:10%">Đơn vị tính</th>
+              <th style="width:10%">Số lượng</th>
+              <th style="width:25%">Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+            <tr style="font-weight:bold">
+              <td colspan="4">TỔNG CỘNG</td>
+              <td>${esc(tc.tongSL)}</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="footer-section">
+          <div class="footer-col"><div style="height: 18px;"></div><b>Duyệt</b><i>(Ký, họ tên)</i></div>
+          <div class="footer-col"><div style="height: 18px;"></div><b>Người giao hàng</b><i>(Ký, họ tên)</i></div>
+          <div class="footer-col"><div style="height: 18px;"></div><b>Người nhận hàng</b><i>(Ký, họ tên)</i></div>
+          <div class="footer-col"><i>Ngày ${esc(tc.ngay)}</i><b>Người lập</b><i>(Ký, họ tên)</i></div>
+        </div>
+
+        <div class="name-row">
+          <div></div><div></div><div></div>
+          <div>${esc(tc.nguoiTao)}</div>
+        </div>
+      `;
+      btn.disabled = false;
+    }
+  </script>
+</body>
+</html>

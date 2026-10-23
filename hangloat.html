@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>In hàng loạt</title>
+  <style>
+    @page { size: 60mm 40mm; margin: 0 !important; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 20px; background: #f0f0f0; font-family: "Cambria", "Times New Roman", serif; }
+
+    .btn-print {
+      position: fixed; top: 10px; right: 10px; padding: 10px 20px; background: #d32f2f; color: white;
+      border: none; border-radius: 5px; cursor: pointer; font-weight: bold; z-index: 1000;
+    }
+    .btn-print:disabled { background: #999; cursor: wait; }
+
+    .label-wrapper { width: 60mm; height: 40mm; margin: 15px auto; page-break-after: always; break-after: page; }
+    .label-container {
+      width: 60mm; height: 40mm; border: 1px dashed #000; background: white; margin: 0 auto;
+      padding: 1.5mm 1.5mm 1.5mm 1mm; position: relative; overflow: hidden;
+      display: grid; grid-template-columns: 1fr 24mm; grid-template-rows: repeat(7, auto);
+    }
+
+    .id-row { display: flex; align-items: center; grid-column: 1 / span 2; margin-bottom: 0.8mm; width: 100%; }
+    .id-row b { font-size: 9pt; white-space: nowrap; }
+    .id-row span { font-size: 9pt; }
+    .ke-badge { font-size: 9pt; font-weight: bold; color: #d32f2f; white-space: nowrap; margin-left: auto; padding-right: 0.5mm; }
+
+    .ten-row { display: flex; align-items: flex-start; grid-column: 1 / span 2; margin-bottom: 0.8mm; }
+    .ten-row b { font-size: 9pt; white-space: nowrap; flex-shrink: 0; }
+    .product-name {
+      font-weight: bold; font-size: 9pt; line-height: 1.2; flex-grow: 1;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word;
+    }
+
+    .info-row { display: flex; align-items: center; grid-column: 1 / span 2; margin-bottom: 0.7mm; word-break: break-all; }
+    .info-row b { font-size: 9pt; white-space: nowrap; }
+    .info-row span { font-size: 9pt; }
+
+    .qrcode-box { position: absolute; right: 1.5mm; bottom: 1.5mm; width: 24mm; height: 24mm; display: flex; align-items: center; justify-content: center; }
+    .qrcode-box img { width: 100%; height: 100%; object-fit: contain; }
+
+    @media print {
+      .no-print { display: none !important; }
+      body { padding: 0 !important; background: white !important; }
+      .label-wrapper { margin: 0 !important; width: 60mm !important; height: 40mm !important; page-break-after: always !important; }
+      .label-container { border: none !important; margin: 0 !important; padding: 1.2mm 1.2mm 1.2mm 0.8mm !important; }
+    }
+  </style>
+</head>
+<body>
+  <button id="btn-print" class="btn-print no-print" disabled>⏳ Đang tải dữ liệu...</button>
+  <div id="print-zone"><h3 style="padding:20px;font-style:italic;">Đang tải dữ liệu nhãn...</h3></div>
+
+  <script>
+
+    // ===== Đọc dữ liệu từ link (phần # được ưu tiên, không có thì lấy ?) =====
+    var _h = new URLSearchParams(location.hash.replace(/^#/, ''));
+    var _q = new URLSearchParams(location.search);
+    function P(k) { return _h.get(k) || _q.get(k) || ''; }
+
+    // Mỗi dòng: 13 trường cách nhau bởi "§", kết thúc bằng "¦" (do cột ảo "Gói dòng" tạo ra)
+    function parseCt(raw) {
+      return String(raw || '').split('¦')
+        .map(function (r) { return r.replace(/^\s*,\s*/, '').trim(); })
+        .filter(function (r) { return r.length; })
+        .map(function (r) {
+          var f = r.split('§');
+          return { maSP: f[0] || '', tenSP: f[1] || '', dvt: f[2] || '', soLuong: f[3] || '', ghiChu: f[4] || '',
+                   id_sp: f[5] || '', ngay: f[6] || '', dnm: f[7] || '', po: f[8] || '', loai: f[9] || '',
+                   lsx: f[10] || '', Donvi: f[11] || '', ke: f[12] || '' };
+        });
+    }
+    function tongHop() {
+      return { soPhieu: P('id'), ngay: P('ngay'), ngayLap: P('ngay'), tongSL: P('tongsl'), lyDo: P('lydo'),
+               kho: P('kho'), diaChi: P('diachi'), nguoiTao: P('nguoitao') };
+    }
+
+    function esc(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    var zone = document.getElementById('print-zone');
+    var btn = document.getElementById('btn-print');
+    function showError(msg) {
+      zone.innerHTML = '<h3 style="color:red;padding:20px;">❌ ' + esc(msg) + '</h3>';
+      btn.style.display = 'none';
+    }
+
+    var id = P('id');
+    if (!id) {
+      showError('Thiếu dữ liệu trên link. Hãy mở trang từ nút in trong AppSheet.');
+    } else {
+      document.title = 'In Hàng Loạt - ' + id;
+      var items = parseCt(P('ct')).map(function (r) {
+        return { id_sp: r.id_sp, ten: r.tenSP, ma: r.maSP, ngay: r.ngay,
+                 so_luong: ((r.soLuong || '0') + ' ' + r.dvt).trim(), dnm: r.dnm, po: r.po,
+                 loai: r.loai, lsx: r.lsx, Donvi: r.Donvi, ke: r.ke,
+                 qr_url: 'https://api.qrserver.com/v1/create-qr-code/?data=' + encodeURIComponent(r.id_sp) + '&size=200x200' };
+      });
+      render(items.length ? { items: items } : { error: 'Không có dòng chi tiết nào trong link cho phiếu: ' + id });
+    }
+
+    function labelHtml(d) {
+      var loai = String(d.loai || '').trim().toLowerCase();
+      var extra = '';
+      if (loai === 'xuất' || loai === 'xuat') {
+        extra =
+          '<div class="info-row"><b>LSX: </b><span class="lsx-text">' + esc(d.lsx) + '</span></div>' +
+          '<div class="info-row"><b>Xưởng: </b><span>' + esc(d.Donvi) + '</span></div>';
+      } else if (loai === 'nhập' || loai === 'nhap') {
+        extra =
+          '<div class="info-row"><b>ĐNM: </b><span>' + esc(d.dnm) + '</span></div>' +
+          '<div class="info-row"><b>PO: </b><span>' + esc(d.po) + '</span></div>';
+      }
+      return '' +
+        '<div class="label-wrapper"><div class="label-container">' +
+          '<div class="id-row">' +
+            '<div><b>ID SP: </b><span>' + esc(d.id_sp) + '</span></div>' +
+            (d.ke ? '<span class="ke-badge">Vị trí: ' + esc(d.ke) + '</span>' : '') +
+          '</div>' +
+          '<div class="ten-row"><b>TÊN SP: </b><span class="product-name">' + esc(d.ten) + '</span></div>' +
+          '<div class="info-row"><b>MÃ SP: </b><span>' + esc(d.ma) + '</span></div>' +
+          '<div class="info-row"><b>NGÀY: </b><span>' + esc(d.ngay) + '</span></div>' +
+          '<div class="info-row"><b>SỐ LƯỢNG: </b><span>' + esc(d.so_luong) + '</span></div>' +
+          extra +
+          '<div class="qrcode-box"><img src="' + esc(d.qr_url) + '" alt="QR Code"></div>' +
+        '</div></div>';
+    }
+
+    function render(data) {
+      if (data.error) { showError(data.error); return; }
+      var list = data.items || [];
+
+      zone.innerHTML = list.map(labelHtml).join('');
+
+      // Tự co cỡ chữ (giữ nguyên cấu hình cũ)
+      ['.product-name', '.lsx-text'].forEach(function (sel) {
+        document.querySelectorAll(sel).forEach(function (el) {
+          var sizes = [9, 8, 7, 6.5];
+          for (var k = 0; k < sizes.length; k++) {
+            el.style.fontSize = sizes[k] + 'pt';
+            if (el.scrollHeight <= 28) break;
+          }
+        });
+      });
+
+      // Chờ QR tải xong mới cho in
+      var imgs = Array.prototype.slice.call(document.querySelectorAll('.qrcode-box img'));
+      Promise.all(imgs.map(function (img) {
+        return new Promise(function (res) {
+          if (img.complete) return res();
+          img.onload = img.onerror = res;
+        });
+      })).then(function () {
+        btn.disabled = false;
+        btn.textContent = '🖨️ In tất cả (' + list.length + ' nhãn)';
+      });
+      btn.addEventListener('click', function () { window.print(); });
+    }
+  </script>
+</body>
+</html>
