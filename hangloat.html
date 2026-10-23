@@ -38,6 +38,11 @@
     .info-row b { font-size: 9pt; white-space: nowrap; }
     .info-row span { font-size: 9pt; }
 
+    /* ĐNM / PO: chỉ rộng đến sát mã QR (không bị QR che), tự xuống dòng khi nội dung dài */
+    .extra-row { align-items: flex-start; max-width: 32mm; word-break: normal; overflow-wrap: anywhere; line-height: 1.15; }
+    .extra-row b { flex-shrink: 0; }
+    .extra-row span { min-width: 0; }
+
     .qrcode-box { position: absolute; right: 1.5mm; bottom: 1.5mm; width: 24mm; height: 24mm; display: flex; align-items: center; justify-content: center; }
     .qrcode-box img { width: 100%; height: 100%; object-fit: contain; }
 
@@ -112,8 +117,8 @@
           '<div class="info-row"><b>Xưởng: </b><span>' + esc(d.Donvi) + '</span></div>';
       } else if (loai === 'nhập' || loai === 'nhap') {
         extra =
-          '<div class="info-row"><b>ĐNM: </b><span>' + esc(d.dnm) + '</span></div>' +
-          '<div class="info-row"><b>PO: </b><span>' + esc(d.po) + '</span></div>';
+          '<div class="info-row extra-row"><b>ĐNM: </b><span>' + esc(d.dnm) + '</span></div>' +
+          '<div class="info-row extra-row"><b>PO: </b><span>' + esc(d.po) + '</span></div>';
       }
       return '' +
         '<div class="label-wrapper"><div class="label-container">' +
@@ -145,6 +150,21 @@
             if (el.scrollHeight <= 28) break;
           }
         });
+      });
+
+      // ĐNM / PO: thu nhỏ chữ cho đến khi hiện đủ nội dung trong khung nhãn (không bị cắt đáy)
+      document.querySelectorAll('.label-container').forEach(function (box) {
+        var spans = box.querySelectorAll('.extra-row span');
+        if (!spans.length) return;
+        var rows = box.querySelectorAll('.extra-row');
+        var last = rows[rows.length - 1];
+        var labels = box.querySelectorAll('.extra-row b');
+        var sizes = [9, 8, 7, 6.5, 6, 5.5];
+        for (var k = 0; k < sizes.length; k++) {
+          for (var s = 0; s < spans.length; s++) spans[s].style.fontSize = sizes[k] + 'pt';
+          for (var l = 0; l < labels.length; l++) labels[l].style.fontSize = Math.max(sizes[k], 7) + 'pt';
+          if (last.getBoundingClientRect().bottom <= box.getBoundingClientRect().bottom - 5.5) break;
+        }
       });
 
       // Chờ QR tải xong mới cho in
