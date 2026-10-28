@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <style>
+    @page {
+      size: 60mm 40mm;
+      margin: 0 !important;
+    }
+    * { box-sizing: border-box; }
+    body { 
+      margin: 0; padding: 20px; background: #f0f0f0; 
+      font-family: "Cambria", "Times New Roman", serif; 
+    }
+    .btn-print { 
+      position: fixed; top: 10px; right: 10px; padding: 10px 20px; 
+      background: #d32f2f; color: white; border: none; border-radius: 5px; 
+      cursor: pointer; font-weight: bold; z-index: 1000; box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+    }
+    .label-wrapper { width: 60mm; height: 40mm; margin: 15px auto; }
+    .label-container {
+      width: 60mm; height: 40mm; border: 1px dashed #000; background: white; margin: 0 auto;
+      padding: 1.5mm 2mm 1.5mm 2mm; position: relative; overflow: hidden;
+      display: grid; grid-template-columns: 32mm 24mm; grid-template-rows: auto auto 1fr; gap: 0.5mm 0;
+    }
+    
+    .top-header-row {
+      grid-column: 1 / span 2; 
+      display: flex; 
+      align-items: center;
+      padding-bottom: 0.5mm;
+    }
+    .top-header-row b, .top-header-row span { font-size: 9pt; }
+    
+    .ke-badge { 
+      font-size: 9pt; 
+      font-weight: bold; 
+      color: #d32f2f; 
+      white-space: nowrap; 
+      margin-left: auto; 
+      padding-right: 1.5mm; 
+    }
+    
+    .ten-row {
+      grid-column: 1 / span 2; display: flex; align-items: flex-start;
+      margin-top: 0.5mm; min-height: 4.5mm; max-height: 8.5mm; overflow: hidden;
+    }
+    .ten-row b { font-size: 9pt; white-space: nowrap; padding-right: 1mm; flex-shrink: 0; }
+    .product-name {
+      font-weight: bold; font-size: 9pt; line-height: 1.15; flex-grow: 1;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word;
+    }
+    
+    .info-row { grid-column: 1 / 2; display: flex; align-items: center; width: 100%; overflow: hidden; }
+    .info-row b { font-size: 9pt; white-space: nowrap; flex-shrink: 0; }
+    .info-row span { font-size: 9pt; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    
+    .qrcode-box {
+      position: absolute; right: 2mm; bottom: 1.5mm; width: 22mm; height: 22mm;
+      display: flex; align-items: center; justify-content: center; background: white;
+    }
+    .qrcode-box img { width: 100%; height: 100%; object-fit: contain; image-rendering: crisp-edges; }
+
+    @media print {
+      .no-print { display: none !important; }
+      body { padding: 0 !important; background: white !important; }
+      .label-wrapper { margin: 0 !important; page-break-after: always !important; }
+      .label-container { border: none !important; margin: 0 !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <button class="btn-print no-print" onclick="window.print()">🖨️ In nhãn</button>
+
+  <div id="print-zone"></div>
+
+  <script src="config.js"></script>
+  <script>
+    try {
+      const p = new URLSearchParams(location.search);
+      const dataFromServer = {
+        id_sp: p.get('id') || '',
+        ten: p.get('ten') || '',
+        ma: p.get('ma') || '',
+        ngay: p.get('ngay') || '',
+        so_luong: p.get('sl') || '',
+        hsd: p.get('hsd') || '',
+        po: p.get('po') || '',
+        loai: p.get('loai') || '',
+        sl_nhan: p.get('soluongtrennhan') || '',
+        ke: p.get('ke') || '',
+        qr_url: qrUrl(p.get('id'))
+      };
+      
+      const rawSl = String(dataFromServer.so_luong || "");
+      const totalQty = Number(rawSl.replace(/[^0-9]/g, '')) || 0; 
+      
+      let labelQty = Number(dataFromServer.sl_nhan);
+      if (!labelQty || labelQty <= 0) {
+        labelQty = totalQty; 
+      }
+
+      const fullLabelsCount = Math.floor(totalQty / labelQty);
+      const remainderQty = totalQty % labelQty;
+      const printZone = document.getElementById('print-zone');
+
+      function createLabelHtml(currentLabelQty) {
+        let vitriHtml = '';
+        if (dataFromServer.ke) {
+          vitriHtml = `<span class="ke-badge">Vị trí: ${dataFromServer.ke}</span>`;
+        } else if (dataFromServer.vitri) {
+          vitriHtml = `<span class="ke-badge">Vị trí: ${dataFromServer.vitri}</span>`;
+        }
+
+        return `
+          <div class="label-wrapper">
+            <div class="label-container">
+              <div class="top-header-row">
+                <div><b>ID SP: </b><span>${dataFromServer.id_sp || ''}</span></div>
+                ${vitriHtml}
+              </div>
+              <div class="ten-row">
+                <b>TÊN SP: </b><span class="product-name">${dataFromServer.ten || ''}</span>
+              </div>
+              
+              <div class="info-row" style="margin-top: 1mm;"><b>MÃ SP: </b><span>${dataFromServer.ma || ''}</span></div>
+              <div class="info-row"><b>NGÀY: </b><span>${dataFromServer.ngay || ''}</span></div>
+              
+              <div class="info-row">
+                <b>SỐ LƯỢNG: </b>
+                <span>${
+                  (function() {
+                    if (dataFromServer.loai === "Nhập") {
+                      var unitText = rawSl.replace(/[0-9]/g, '').trim();
+                      return currentLabelQty + "/" + totalQty + " " + unitText;
+                    } else {
+                      return dataFromServer.so_luong || "";
+                    }
+                  })()
+                }</span>
+              </div>
+              
+              <div class="info-row short-row"><b>HSD:</b><span>${dataFromServer.hsd || ''}</span></div>
+              <div class="info-row"><b>PO: </b><span>${dataFromServer.po || ''}</span></div>
+              <div class="qrcode-box"><img src="${dataFromServer.qr_url || ''}" alt="QR Code"></div>
+            </div>
+          </div>
+        `;
+      }
+
+      for (let i = 0; i < fullLabelsCount; i++) {
+        printZone.innerHTML += createLabelHtml(labelQty);
+      }
+
+      if (remainderQty > 0) {
+        printZone.innerHTML += createLabelHtml(remainderQty);
+      }
+
+      document.querySelectorAll('.product-name').forEach(function(el) {
+        const sizes = [9, 8, 7.5, 6.5];
+        let parent = el.parentElement;
+        for (let size of sizes) {
+          el.style.fontSize = size + 'pt';
+          if (parent.scrollHeight <= parent.clientHeight) break;
+        }
+      });
+
+    } catch (error) {
+      document.getElementById('print-zone').innerHTML = `<h3 style="color:red; padding:20px;">Lỗi xử lý mã: ${error.message}</h3>`;
+    }
+  </script>
+</body>
+</html>
