@@ -5,7 +5,10 @@ function qrUrl(text) {
          encodeURIComponent(text || "") + "&size=200x200";
 }
 
-async function callApi(page, id) {
-  const res = await fetch(API_URL + "?page=" + page + "&id=" + encodeURIComponent(id));
-  return res.json();
+// Tách chuỗi dòng chi tiết: các dòng cách nhau bởi "|", các cột cách nhau bởi "~"
+function parseRows(str) {
+  return (str || "").split("|")
+    .map(function (r) { return r.replace(/^[\s,]+/, "").trim(); })
+    .filter(function (r) { return r; })
+    .map(function (r) { return r.split("~").map(function (x) { return x.trim(); }); });
 }
