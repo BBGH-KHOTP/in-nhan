@@ -97,15 +97,24 @@
 
   <script src="config.js"></script>
   <script>
-    const idPhieu = new URLSearchParams(location.search).get('id') || '';
-
-    window.onload = function() {
-      callApi('api_phieu', idPhieu)
-        .then(renderPhieu)
-        .catch(function (err) {
-          document.getElementById('content').innerHTML =
-            '<h3 style="color:red">Lỗi: ' + err.message + '</h3>';
-        });
+    window.onload = function () {
+      const p = new URLSearchParams(location.search);
+      const rows = parseRows(p.get('ct'));
+      renderPhieu({
+        thongTinChung: {
+          soPhieu: p.get('id') || '',
+          ngay: p.get('ngay') || '',
+          ngayLap: p.get('ngay') || '',
+          tongSL: p.get('tongsl') || '',
+          lyDo: p.get('lydo') || '',
+          kho: p.get('kho') || '',
+          diaChi: p.get('diachi') || '',
+          nguoiTao: p.get('nguoitao') || ''
+        },
+        chiTietVatTu: rows.map(function (r) {
+          return { maSP: r[0] || '', tenSP: r[1] || '', dvt: r[2] || '', soLuong: r[3] || '', ghiChu: r[4] || '' };
+        })
+      });
     };
 
     function renderPhieu(data) {
