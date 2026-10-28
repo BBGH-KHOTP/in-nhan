@@ -148,15 +148,19 @@
 
   <script src="config.js"></script>
   <script>
-    const id = new URLSearchParams(location.search).get('id') || '';
+    const p = new URLSearchParams(location.search);
+    const items = parseRows(p.get('ct')).map(function (r) {
+      return { id_sp: r[0] || '', ten: r[1] || '', ma: r[2] || '', ngay: r[3] || '',
+               so_luong: r[4] || '', HSD: r[5] || '', po: r[6] || '' };
+    });
+    const zone = document.getElementById('zone');
 
-    callApi('api_hang_loat', id).then(function (res) {
-      const zone = document.getElementById('zone');
-      if (res.error) { zone.innerHTML = '<h3 style="color:red;padding:20px">' + res.error + '</h3>'; return; }
+    if (!items.length) {
+      zone.innerHTML = '<h3 style="color:red;padding:20px">Không có dữ liệu nhãn (thiếu tham số ct)</h3>';
+    } else {
+      document.getElementById('btn').textContent = '🖨️ In tất cả (' + items.length + ' nhãn)';
 
-      document.getElementById('btn').textContent = '🖨️ In tất cả (' + res.items.length + ' nhãn)';
-
-      zone.innerHTML = res.items.map(function (d) { return `
+      zone.innerHTML = items.map(function (d) { return `
         <div class="label-wrapper">
           <div class="label-container">
             <div class="id-row"><div><b>ID SP: </b><span>${d.id_sp}</span></div></div>
@@ -176,9 +180,7 @@
           if (el.scrollHeight <= 28) break;
         }
       });
-    }).catch(function (e) {
-      document.getElementById('zone').innerHTML = '<h3 style="color:red;padding:20px">Lỗi: ' + e.message + '</h3>';
-    });
+    }
   </script>
 </body>
 </html>
